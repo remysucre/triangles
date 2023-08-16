@@ -1,0 +1,43 @@
+\documentclass{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\newcommand{\I}{\mathbf{1}}
+
+\begin{document}
+
+\begin{align*}
+\sum_{j} \I_{j=k} \times f(j) = f(k)
+\end{align*}
+
+\begin{align*}
+A_{ij} \times \I_{i=j} & = 0 \\
+A_{ij} \times \I_{i<j} & = A_{ij} \times \I_{i>j}
+\end{align*}
+
+\begin{align*}
+  & \text{trace}(A^3) / 6 \\
+= & \text{ (expand)} \\
+  & \sum_i \sum_l \I_{i=l} \times \left( \sum_k \left(\sum_j A_{ij} \times A_{jk} \right) \times A_{kl} \right) / 6 \\
+= & \text{ (eliminate sum over indicator)} \\
+  &  \sum_i \left( \sum_k \left(\sum_j A_{ij} \times A_{jk} \right) \times A_{ki} \right) / 6 \\
+= & \text{ (introduce conditionals)}  \\
+  & \sum_{ijk} (\I_{i>k} + \I_{i<k} + \I_{i=k})\times (\I_{j>k} + \I_{j<k} + \I_{j=k}) \times (\I_{i<j} + \I_{i>j} + \I_{i=j}) \times A_{ij} \times A_{jk} \times  A_{ki} / 6 \\
+= & \text{ (pull out +, omit zero terms) } \\
+  & \left( \sum_{ijk} \I_{i<j} \times \I_{j<k} \times \I_{i<k} \times A_{ij} \times A_{jk} \times A_{ki} \right. \\
+& + \sum_{ijk} \I_{i<k} \times \I_{k<j} \times \I_{i<j} \times A_{ij} \times A_{jk} \times A_{ki} \\
+&+  \sum_{ijk} \I_{j<i} \times \I_{i<k} \times \I_{j<k} \times A_{ij} \times A_{jk} \times A_{ki} \\
+&+  \sum_{ijk} \I_{j<k} \times \I_{k<i} \times \I_{j<i} \times A_{ij} \times A_{jk} \times A_{ki} \\
+&+  \sum_{ijk} \I_{k<i} \times \I_{i<j} \times \I_{k<j} \times A_{ij} \times A_{jk} \times A_{ki} \\
+&+  \left. \sum_{ijk} \I_{k<j} \times \I_{j<i} \times \I_{k<i} \times A_{ij} \times A_{jk} \times A_{ki} \right) / 6 \\
+= & \text{ (symmetry)} \\
+  & \sum_i \sum_k \left(\sum_j A_{ij} \times \I_{i<j} \times A_{jk} \times \I_{j>k}\right) \times A_{ik} \times \I_{i<k} \\
+= & \text{ (to LA)} \\
+  & \text{sum} ((LU) \otimes L)
+\end{align*}
+
+% i<j<k, i<k<j, j<i<k, j<k<i, k<i<j, k<j<i
+
+\end{document}
