@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 egg = "0.9.5"
+indexmap = "2.0.0"

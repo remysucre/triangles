@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use std::vec;
 
 use egg::{rewrite as rw, *};
@@ -8,20 +9,181 @@ pub struct FvAnalysis;
 
 type EGraph = egg::EGraph<LARA, FvAnalysis>;
 
+#[derive(Debug)]
+pub struct EScheduler {
+    default_match_limit: usize,
+    default_ban_length: usize,
+    stats: IndexMap<Id, EStats>,
+}
+
+impl Default for EScheduler {
+    fn default() -> Self {
+        Self {
+            stats: Default::default(),
+            default_match_limit: 1_000,
+            default_ban_length: 5,
+        }
+    }
+}
+
+impl EScheduler {
+    /// Set the initial match limit after which a rule will be banned.
+    /// Default: 1,000
+    pub fn with_initial_match_limit(mut self, limit: usize) -> Self {
+        self.default_match_limit = limit;
+        self
+    }
+
+    /// Set the initial ban length.
+    /// Default: 5 iterations
+    pub fn with_ban_length(mut self, ban_length: usize) -> Self {
+        self.default_ban_length = ban_length;
+        self
+    }
+
+    fn rule_stats(&mut self, class: Id) -> &mut EStats {
+        if self.stats.contains_key(&class) {
+            &mut self.stats[&class]
+        } else {
+            self.stats.entry(class).or_insert(EStats {
+                times_applied: 0,
+                banned_until: 0,
+                times_banned: 0,
+                match_limit: self.default_match_limit,
+                ban_length: self.default_ban_length,
+            })
+        }
+        // if self.stats.contains_key(&name) {
+        //     &mut self.stats[&name]
+        // } else {
+        //     self.stats.entry(name).or_insert(RuleStats {
+        //         times_applied: 0,
+        //         banned_until: 0,
+        //         times_banned: 0,
+        //         match_limit: self.default_match_limit,
+        //         ban_length: self.default_ban_length,
+        //     })
+        // }
+    }
+}
+
+#[derive(Debug)]
+struct EStats {
+    times_applied: usize,
+    banned_until: usize,
+    times_banned: usize,
+    match_limit: usize,
+    ban_length: usize,
+}
+
+impl<L, N> RewriteScheduler<L, N> for EScheduler
+where
+    L: Language,
+    N: Analysis<L>,
+{
+    fn can_stop(&mut self, iteration: usize) -> bool {
+        let n_stats = self.stats.len();
+
+        let mut banned: Vec<_> = self
+            .stats
+            .iter_mut()
+            .filter(|(_, s)| s.banned_until > iteration)
+            .collect();
+
+        if banned.is_empty() {
+            true
+        } else {
+            let min_ban = banned
+                .iter()
+                .map(|(_, s)| s.banned_until)
+                .min()
+                .expect("banned cannot be empty here");
+
+            assert!(min_ban >= iteration);
+            let delta = min_ban - iteration;
+
+            let mut unbanned = vec![];
+            for (name, s) in &mut banned {
+                s.banned_until -= delta;
+                if s.banned_until == iteration {
+                    unbanned.push(*name);
+                }
+            }
+
+            assert!(!unbanned.is_empty());
+            // info!(
+            //     "Banned {}/{}, fast-forwarded by {} to unban {}",
+            //     banned.len(),
+            //     n_stats,
+            //     delta,
+            //     unbanned.join(", "),
+            // );
+
+            false
+        }
+    }
+
+    fn search_rewrite<'a>(
+        &mut self,
+        iteration: usize,
+        egraph: &egg::EGraph<L, N>,
+        rewrite: &'a Rewrite<L, N>,
+    ) -> Vec<SearchMatches<'a, L>> {
+        let mut ms = rewrite.search(egraph);
+        ms.retain(|m| egraph[m.eclass].len() < 20);
+        ms
+
+        // let stats = self.rule_stats(rewrite.name);
+
+        // if iteration < stats.banned_until {
+        //     // debug!(
+        //     //     "Skipping {} ({}-{}), banned until {}...",
+        //     //     rewrite.name, stats.times_applied, stats.times_banned, stats.banned_until,
+        //     // );
+        //     return vec![];
+        // }
+
+        // let threshold = stats
+        //     .match_limit
+        //     .checked_shl(stats.times_banned as u32)
+        //     .unwrap();
+        // let matches = rewrite.search_with_limit(egraph, threshold.saturating_add(1));
+        // let total_len: usize = matches.iter().map(|m| m.substs.len()).sum();
+        // if total_len > threshold {
+        //     let ban_length = stats.ban_length << stats.times_banned;
+        //     stats.times_banned += 1;
+        //     stats.banned_until = iteration + ban_length;
+        //     // info!(
+        //     //     "Banning {} ({}-{}) for {} iters: {} < {}",
+        //     //     rewrite.name,
+        //     //     stats.times_applied,
+        //     //     stats.times_banned,
+        //     //     ban_length,
+        //     //     threshold,
+        //     //     total_len,
+        //     // );
+        //     vec![]
+        // } else {
+        //     stats.times_applied += 1;
+        //     matches
+        // }
+    }
+}
+
 struct ClassScheduler;
 
-impl <L, N> RewriteScheduler<L, N> for ClassScheduler
+impl<L, N> RewriteScheduler<L, N> for ClassScheduler
 where
     L: Language,
     N: Analysis<L>,
 {
     fn search_rewrite<'a>(
-            &mut self,
-            _iteration: usize,
-            egraph: &egg::EGraph<L, N>,
-            rewrite: &'a Rewrite<L, N>,
-        ) -> Vec<SearchMatches<'a, L>> {
-        let mut ms =  rewrite.search(egraph);
+        &mut self,
+        _iteration: usize,
+        egraph: &egg::EGraph<L, N>,
+        rewrite: &'a Rewrite<L, N>,
+    ) -> Vec<SearchMatches<'a, L>> {
+        let mut ms = rewrite.search(egraph);
         ms.retain(|m| egraph[m.eclass].len() < 20);
         ms
     }
@@ -306,16 +468,15 @@ fn main() {
             .parse()
             .unwrap();
 
-    let e3: RecExpr<LARA> = 
+    let e3: RecExpr<LARA> =
         "(/ (sum i (sum j (sum k (+ (* (* (* (A (var j) (var k)) (+ (I (> (var j) (var k))) (I (< (var j) (var k))))) (* (A (var k) (var i)) (+ (I (> (var k) (var i))) (I (< (var k) (var i)))))) (* (A (var i) (var j)) (I (< (var i) (var j))))) (* (* (* (A (var j) (var k)) (+ (I (> (var j) (var k))) (I (< (var j) (var k))))) (* (A (var k) (var i)) (+ (I (> (var k) (var i))) (I (< (var k) (var i)))))) (* (A (var i) (var j)) (I (> (var i) (var j))))))))) 6)"
             .parse()
             .unwrap();
 
-    let e4: RecExpr<LARA> = 
+    let e4: RecExpr<LARA> =
         "(/ (+ (+ (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (> (var k) (var i))) (I (> (var i) (var j))))))))) (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (> (var k) (var i))) (I (< (var i) (var j)))))))))) (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (< (var k) (var i))) (I (> (var i) (var j))))))))) (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var i) (var j))))))))))) (+ (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (> (var k) (var i))) (I (> (var i) (var j))))))))) (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (> (var k) (var i))) (I (< (var i) (var j)))))))))) (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (> (var i) (var j))))))))) (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var i) (var j)))))))))))) 6)"
             .parse()
             .unwrap();
-
 
     let e5: RecExpr<LARA> = "(/ (+ (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum i (sum k (sum j (* (* (I (< (var i) (var k))) (* (I (< (var k) (var j))) (I (< (var i) (var j))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum j (sum i (sum k (* (* (I (< (var j) (var i))) (* (I (< (var i) (var k))) (I (< (var j) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))))) (+ (sum j (sum k (sum i (* (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var j) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum k (sum i (sum j (* (* (I (< (var k) (var i))) (* (I (< (var i) (var j))) (I (< (var k) (var j))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum k (sum j (sum i (* (* (I (< (var k) (var j))) (* (I (< (var j) (var i))) (I (< (var k) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))))) 6)"
             .parse()

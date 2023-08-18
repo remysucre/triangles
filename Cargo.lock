@@ -39,8 +39,8 @@ checksum = "96beaf9d35dbc4686bc86a4ecb851fd6a406f0bf32d9f646b1225a5c5cf5b5d7"
 dependencies = [
  "env_logger",
  "fxhash",
- "hashbrown",
- "indexmap",
+ "hashbrown 0.12.3",
+ "indexmap 1.9.3",
  "instant",
  "log",
  "smallvec",
@@ -57,6 +57,12 @@ checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
 dependencies = [
  "log",
 ]
+
+[[package]]
+name = "equivalent"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "fxhash"
@@ -88,13 +94,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashbrown"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c6201b9ff9fd90a5a3bac2e56a830d0caa509576f0e503818ee82c181b3437a"
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
- "hashbrown",
+ "hashbrown 0.12.3",
+]
+
+[[package]]
+name = "indexmap"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
+dependencies = [
+ "equivalent",
+ "hashbrown 0.14.0",
 ]
 
 [[package]]
@@ -155,7 +177,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32bf088d1d7df2b2b6711b06da3471bc86677383c57b27251e18c56df8deac14"
 dependencies = [
  "ahash",
- "hashbrown",
+ "hashbrown 0.12.3",
 ]
 
 [[package]]
@@ -200,6 +222,7 @@ name = "triangles"
 version = "0.1.0"
 dependencies = [
  "egg",
+ "indexmap 2.0.0",
 ]
 
 [[package]]
