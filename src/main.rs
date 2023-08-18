@@ -417,9 +417,11 @@ fn main() {
         .with_expr(&e5b)
         .with_expr(&e6)
         .with_expr(&e7)
+        // .with_scheduler(SimpleScheduler)
         .with_scheduler(EScheduler::default())
         .with_node_limit(5000000)
         .with_time_limit(std::time::Duration::new(20, 0))
+        // .with_iter_limit(500)
         .run(&rules());
 
     // dbg!(runner.egraph.equivs(&e0, &e1));
