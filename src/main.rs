@@ -20,7 +20,7 @@ impl Default for EScheduler {
     fn default() -> Self {
         Self {
             stats: Default::default(),
-            default_match_limit: 5,
+            default_match_limit: 10,
             default_ban_length: 3,
         }
     }
@@ -118,12 +118,12 @@ where
             if stats.banned_until > iteration {
                 false
             } else {
-                let threshold = stats.match_limit * stats.times_banned;
+                let threshold = stats.match_limit + 3 * stats.times_banned;
                 // let threshold = stats.match_limit + stats.times_banned;
                 let len: usize = egraph[m.eclass].len();
                 if len > threshold {
-                    // let ban_length = stats.ban_length * stats.times_banned;
-                    let ban_length = stats.ban_length;
+                    let ban_length = stats.ban_length + 2 * stats.times_banned;
+                    // let ban_length = stats.ban_length;
                     stats.times_banned += 1;
                     stats.banned_until = iteration + ban_length;
                     false
@@ -374,7 +374,7 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
         rw!("order"; "(* (I (< (var ?i) (var ?j))) (I (< (var ?j) (var ?k))))" => "(* (* (I (< (var ?i) (var ?j))) (I (< (var ?j) (var ?k)))) (I (< (var ?i) (var ?k))))"),
         rw!("id"; "(* (I ?c) (I ?c))" => "(I ?c)"),
         rw!("sum-0"; "(sum ?i 0)" => "0"),
-        rw!("fold"; "(/ (+ (+ (+ ?a ?a) ?a) (+ (+ ?a ?a) ?a)) 6)" => "?a"),
+        rw!("fold"; "(/ (+ (+ ?a (+ ?a ?a)) (+ ?a (+ ?a ?a))) 6)" => "?a"),
     ]);
 
     rls
@@ -409,6 +409,14 @@ fn main() {
             .parse()
             .unwrap();
 
+    let e5a: RecExpr<LARA> = "(/ (+ (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))))) (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))))) 6)"
+            .parse()
+            .unwrap();
+
+    let e5b: RecExpr<LARA> = "(sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))"
+            .parse()
+            .unwrap();
+
     let e6: RecExpr<LARA> = "(sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))"
             .parse()
             .unwrap();
@@ -424,21 +432,24 @@ fn main() {
         .with_expr(&e3)
         .with_expr(&e4)
         .with_expr(&e5)
+        .with_expr(&e5a)
+        .with_expr(&e5b)
         .with_expr(&e6)
         .with_expr(&e7)
         .with_scheduler(EScheduler::default())
         .with_node_limit(5000000)
-        // .with_iter_limit(50)
         .with_time_limit(std::time::Duration::new(20, 0))
         .run(&rules());
 
-    dbg!(runner.egraph.equivs(&e0, &e1));
-    dbg!(runner.egraph.equivs(&e1, &e2));
-    dbg!(runner.egraph.equivs(&e2, &e3));
-    dbg!(runner.egraph.equivs(&e3, &e4));
-    dbg!(runner.egraph.equivs(&e4, &e5));
-    dbg!(runner.egraph.equivs(&e5, &e6));
-    dbg!(runner.egraph.equivs(&e6, &e7));
+    // dbg!(runner.egraph.equivs(&e0, &e1));
+    // dbg!(runner.egraph.equivs(&e1, &e2));
+    // dbg!(runner.egraph.equivs(&e2, &e3));
+    // dbg!(runner.egraph.equivs(&e3, &e4));
+    // dbg!(runner.egraph.equivs(&e4, &e5));
+    // dbg!(runner.egraph.equivs(&e5, &e6));
+    // dbg!(runner.egraph.equivs(&e6, &e7));
+
+    dbg!(runner.egraph.equivs(&e0, &e7));
 
     dbg!(runner.stop_reason);
 
