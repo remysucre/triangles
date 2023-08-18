@@ -20,56 +20,39 @@ impl Default for EScheduler {
     fn default() -> Self {
         Self {
             stats: Default::default(),
-            default_match_limit: 1_000,
-            default_ban_length: 5,
+            default_match_limit: 5,
+            default_ban_length: 3,
         }
     }
 }
 
 impl EScheduler {
-    /// Set the initial match limit after which a rule will be banned.
-    /// Default: 1,000
     pub fn with_initial_match_limit(mut self, limit: usize) -> Self {
         self.default_match_limit = limit;
         self
     }
 
-    /// Set the initial ban length.
-    /// Default: 5 iterations
     pub fn with_ban_length(mut self, ban_length: usize) -> Self {
         self.default_ban_length = ban_length;
         self
     }
 
-    fn rule_stats(&mut self, class: Id) -> &mut EStats {
+    fn e_stats(&mut self, class: Id) -> &mut EStats {
         if self.stats.contains_key(&class) {
             &mut self.stats[&class]
         } else {
             self.stats.entry(class).or_insert(EStats {
-                times_applied: 0,
                 banned_until: 0,
                 times_banned: 0,
                 match_limit: self.default_match_limit,
                 ban_length: self.default_ban_length,
             })
         }
-        // if self.stats.contains_key(&name) {
-        //     &mut self.stats[&name]
-        // } else {
-        //     self.stats.entry(name).or_insert(RuleStats {
-        //         times_applied: 0,
-        //         banned_until: 0,
-        //         times_banned: 0,
-        //         match_limit: self.default_match_limit,
-        //         ban_length: self.default_ban_length,
-        //     })
-        // }
     }
 }
 
 #[derive(Debug)]
 struct EStats {
-    times_applied: usize,
     banned_until: usize,
     times_banned: usize,
     match_limit: usize,
@@ -82,7 +65,7 @@ where
     N: Analysis<L>,
 {
     fn can_stop(&mut self, iteration: usize) -> bool {
-        let n_stats = self.stats.len();
+        // let n_stats = self.stats.len();
 
         let mut banned: Vec<_> = self
             .stats
@@ -130,64 +113,47 @@ where
         rewrite: &'a Rewrite<L, N>,
     ) -> Vec<SearchMatches<'a, L>> {
         let mut ms = rewrite.search(egraph);
-        ms.retain(|m| egraph[m.eclass].len() < 20);
-        ms
-
-        // let stats = self.rule_stats(rewrite.name);
-
-        // if iteration < stats.banned_until {
-        //     // debug!(
-        //     //     "Skipping {} ({}-{}), banned until {}...",
-        //     //     rewrite.name, stats.times_applied, stats.times_banned, stats.banned_until,
-        //     // );
-        //     return vec![];
-        // }
-
-        // let threshold = stats
-        //     .match_limit
-        //     .checked_shl(stats.times_banned as u32)
-        //     .unwrap();
-        // let matches = rewrite.search_with_limit(egraph, threshold.saturating_add(1));
-        // let total_len: usize = matches.iter().map(|m| m.substs.len()).sum();
-        // if total_len > threshold {
-        //     let ban_length = stats.ban_length << stats.times_banned;
-        //     stats.times_banned += 1;
-        //     stats.banned_until = iteration + ban_length;
-        //     // info!(
-        //     //     "Banning {} ({}-{}) for {} iters: {} < {}",
-        //     //     rewrite.name,
-        //     //     stats.times_applied,
-        //     //     stats.times_banned,
-        //     //     ban_length,
-        //     //     threshold,
-        //     //     total_len,
-        //     // );
-        //     vec![]
-        // } else {
-        //     stats.times_applied += 1;
-        //     matches
-        // }
-    }
-}
-
-struct ClassScheduler;
-
-impl<L, N> RewriteScheduler<L, N> for ClassScheduler
-where
-    L: Language,
-    N: Analysis<L>,
-{
-    fn search_rewrite<'a>(
-        &mut self,
-        _iteration: usize,
-        egraph: &egg::EGraph<L, N>,
-        rewrite: &'a Rewrite<L, N>,
-    ) -> Vec<SearchMatches<'a, L>> {
-        let mut ms = rewrite.search(egraph);
-        ms.retain(|m| egraph[m.eclass].len() < 20);
+        ms.retain(|m| {
+            let stats = self.e_stats(m.eclass);
+            if stats.banned_until > iteration {
+                false
+            } else {
+                let threshold = stats.match_limit * stats.times_banned;
+                // let threshold = stats.match_limit + stats.times_banned;
+                let len: usize = egraph[m.eclass].len();
+                if len > threshold {
+                    // let ban_length = stats.ban_length * stats.times_banned;
+                    let ban_length = stats.ban_length;
+                    stats.times_banned += 1;
+                    stats.banned_until = iteration + ban_length;
+                    false
+                } else {
+                    true
+                }
+            }
+        });
         ms
     }
 }
+
+// struct ClassScheduler;
+
+// impl<L, N> RewriteScheduler<L, N> for ClassScheduler
+// where
+//     L: Language,
+//     N: Analysis<L>,
+// {
+//     fn search_rewrite<'a>(
+//         &mut self,
+//         _iteration: usize,
+//         egraph: &egg::EGraph<L, N>,
+//         rewrite: &'a Rewrite<L, N>,
+//     ) -> Vec<SearchMatches<'a, L>> {
+//         let mut ms = rewrite.search(egraph);
+//         ms.retain(|m| egraph[m.eclass].len() < 20);
+//         ms
+//     }
+// }
 
 // Metadata for each class
 #[derive(Debug, PartialEq, Eq)]
@@ -370,36 +336,6 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
         rw!("let-rel"; "(let ?x ?e (A ?i ?j))" => "(A (let ?x ?e ?i) (let ?x ?e ?j))"),
     ]);
 
-    // squash axioms
-    // rls.extend(vec![
-    //     rw!("1-a";   "(|| 0)" => "0"),
-    //     rw!("1-a-r"; "0" => "(|| 0)"),
-    //     rw!("1-b"; "(|| (+ 1 ?x))" => "1"),
-    //     rw!("2";   "(|| (+ (|| ?x) ?y))" => "(|| (+ ?x ?y))"),
-    //     rw!("2-r"; "(|| (+ ?x ?y))" => "(|| (+ (|| ?x) ?y))"),
-    //     rw!("3";   "(* (|| ?x) (|| ?y))" => "(|| (* ?x ?y))"),
-    //     rw!("3-r"; "(|| (* ?x ?y))" => "(* (|| ?x) (|| ?y))"),
-    //     rw!("4";   "(* (|| ?x) (|| ?x))" => "(|| ?x)"),
-    //     rw!("4-r"; "(|| ?x)" => "(* (|| ?x) (|| ?x))"),
-    //     rw!("5";   "(* ?x (|| ?x))" => "?x"),
-    //     rw!("5-r"; "?x" => "(* ?x (|| ?x))"),
-    //     rw!("6";   "(|| ?x)" => "?x" if ConditionEqual::parse("?x", "(* ?x ?x))")),
-    //     rw!("6-r"; "?x" => "(|| ?x)" if ConditionEqual::parse("?x", "(* ?x ?x))")),
-    // ]);
-
-    // negation axioms
-    // rls.extend(vec![
-    //     rw!("n-1";   "(not 0)" => "1"),
-    //     rw!("n-1-r"; "1" => "(not 0)"),
-    //     rw!("n-2";   "(not (* ?x ?y))" => "(|| (+ (not ?x) (not ?y)))"),
-    //     rw!("n-2-r"; "(|| (+ (not ?x) (not ?y)))" => "(not (* ?x ?y))"),
-    //     rw!("n-3";   "(not (+ ?x ?y))" => "(* (not ?x) (not ?y))"),
-    //     rw!("n-3-r"; "(* (not ?x) (not ?y))" => "(not (+ ?x ?y))"),
-    //     rw!("n-4-a"; "(not (|| ?x))" => "(|| (not ?x))"),
-    //     rw!("n-4-b"; "(|| (not ?x))" => "(not ?x)"),
-    //     rw!("n-4-c"; "(not ?x)" => "(not (|| ?x))"),
-    // ]);
-
     // summation axioms
     rls.extend(vec![
         rw!("elim-sum-ind"; "(sum ?j (* (I (= (var ?j) ?k)) ?e))" => "(let ?j ?k ?e)"),
@@ -417,8 +353,6 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
                 e: "(sum ?fresh (* ?b (let ?x ?fresh ?a)))".parse().unwrap()
             }}
             if free(var("?x"), var("?b"))),
-        // rw!("10";   "(|| (sum ?t ?a))" => "(|| (sum ?t (|| ?a)))"),
-        // rw!("10-r"; "(|| (sum ?t (|| ?a)))" => "(|| (sum ?t ?a))"),
     ]);
 
     // conditional axioms
@@ -429,21 +363,14 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
         rw!("conditions"; "(A (var ?i) (var ?j))" => "(* (A (var ?i) (var ?j)) (+ (I (< (var ?i) (var ?j))) (+ (I (> (var ?i) (var ?j))) (I (= (var ?i) (var ?j))))))"), 
         rw!("comparison"; "(< ?vi ?vj)" => "(> ?vj ?vi)"),
         rw!("comparison-r"; "(> ?vi ?vj)" => "(< ?vj ?vi)"),
-        // rw!("neq";   "(not (= ?x ?y))" => "(!= ?x ?y)"),
-        // rw!("neq-r"; "(!= ?x ?y)" => "(not (= ?x ?y))"),
-        // rw!("11";   "(I ?b)" => "(|| (I ?b))"),
-        // rw!("11-r";   "(|| (I ?b))" => "(I ?b)"),
-        // rw!("12"; "(+ (I (= ?a ?b)) (I (!= ?a ?b)))"=>"1"),
-        // rw!("13"; "(* ?e (I (= (var ?x) ?y)))" => "(* (let ?x ?y ?e) (I (= (var ?x) ?y)))"),
-        // rw!("14"; "(sum ?t (I (= (var ?t) ?e)))" => "1" if not_free(var("?t"), var("?e"))),
     ]);
 
     rls.extend(vec![
         rw!("no-self-loop"; "(* (I (= (var ?i) (var ?j))) (A (var ?i) (var ?j)))" => "0"),
-        rw!("symmetry-sum"; "(sum i (sum j (* ?e (* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j)))))))" => "(sum i (sum j (* ?e (* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j)))))))"),
+        rw!("symmetry-sum-l"; "(sum i (sum j (* ?e (* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j)))))))" => "(sum i (sum j (* ?e (* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j)))))))"),
         rw!("symmetry-sum-r"; "(sum i (sum j (* ?e (* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j)))))))" => "(sum i (sum j (* ?e (* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j)))))))"),
         rw!("symmetry"; "(A (var ?i) (var ?j))" => "(A (var ?j) (var ?i))"),
-        rw!("conflict-1"; "(* (I (< (var ?i) (var ?j))) (I (> (var ?i) (var ?j))))" => "0"),
+        rw!("conflict"; "(* (I (< (var ?i) (var ?j))) (I (> (var ?i) (var ?j))))" => "0"),
         rw!("order"; "(* (I (< (var ?i) (var ?j))) (I (< (var ?j) (var ?k))))" => "(* (* (I (< (var ?i) (var ?j))) (I (< (var ?j) (var ?k)))) (I (< (var ?i) (var ?k))))"),
         rw!("id"; "(* (I ?c) (I ?c))" => "(I ?c)"),
         rw!("sum-0"; "(sum ?i 0)" => "0"),
@@ -491,16 +418,15 @@ fn main() {
             .unwrap();
 
     let runner = Runner::default()
-        // .with_expr(&e0)
-        // .with_expr(&e1)
-        // .with_expr(&e2)
+        .with_expr(&e0)
+        .with_expr(&e1)
+        .with_expr(&e2)
         .with_expr(&e3)
-        // .with_expr(&e4)
+        .with_expr(&e4)
         .with_expr(&e5)
         .with_expr(&e6)
-        // .with_expr(&e7)
-        // .with_scheduler(SimpleScheduler)
-        .with_scheduler(ClassScheduler)
+        .with_expr(&e7)
+        .with_scheduler(EScheduler::default())
         .with_node_limit(5000000)
         // .with_iter_limit(50)
         .with_time_limit(std::time::Duration::new(20, 0))
@@ -515,4 +441,8 @@ fn main() {
     dbg!(runner.egraph.equivs(&e6, &e7));
 
     dbg!(runner.stop_reason);
+
+    dbg!(runner.egraph.number_of_classes());
+    dbg!(runner.egraph.total_number_of_nodes());
+    dbg!(runner.egraph.classes().map(|c| c.nodes.len()).max());
 }
