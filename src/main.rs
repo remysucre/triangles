@@ -52,6 +52,12 @@ impl Analysis<LARA> for FvAnalysis {
 
         Data { free }
     }
+
+    fn modify(egraph: &mut egg::EGraph<LARA, Self>, id: Id) {
+        if egraph[id].nodes.iter().any(|n| matches!(n, LARA::Num(0))) {
+            egraph[id].nodes.retain(|n| matches!(n, LARA::Num(0)));
+        }
+    }
 }
 
 define_language! {
@@ -240,6 +246,8 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
         rw!("let-cond"; "(let ?x ?e (I ?c))" => "(I (let ?x ?e ?c))"),
         // HACK
         rw!("conditions"; "(A (var ?i) (var ?j))" => "(* (A (var ?i) (var ?j)) (+ (I (< (var ?i) (var ?j))) (+ (I (> (var ?i) (var ?j))) (I (= (var ?i) (var ?j))))))"), 
+        rw!("comparison"; "(< ?vi ?vj)" => "(> ?vj ?vi)"),
+        rw!("comparison"; "(> ?vi ?vj)" => "(< ?vj ?vi)"),
         // rw!("neq";   "(not (= ?x ?y))" => "(!= ?x ?y)"),
         // rw!("neq-r"; "(!= ?x ?y)" => "(not (= ?x ?y))"),
         // rw!("11";   "(I ?b)" => "(|| (I ?b))"),
@@ -251,8 +259,9 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
 
     rls.extend(vec![
         rw!("no-self-loop"; "(* (I (= (var ?i) (var ?j))) (A (var ?i) (var ?j)))" => "0"),
-        rw!("symmetry"; "(* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j))))" => "(* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j))))"),
-        rw!("symmetry"; "(* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j))))" => "(* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j))))"),
+        rw!("symmetry"; "(sum i (sum j (* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j))))))" => "(sum i (sum j (* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j))))))"),
+        rw!("symmetry"; "(sum i (sum j (* (A (var ?i) (var ?j)) (I (> (var ?i) (var ?j))))))" => "(sum i (sum j (* (A (var ?i) (var ?j)) (I (< (var ?i) (var ?j))))))"),
+        rw!("symmetry"; "(A (var ?i) (var ?j))" => "(A (var ?j) (var ?i))"),
         rw!("conflict-1"; "(* (I (< (var ?i) (var ?j))) (I (> (var ?i) (var ?j))))" => "0"),
         rw!("order"; "(* (I (< (var ?i) (var ?j))) (I (< (var ?j) (var ?k))))" => "(* (* (I (< (var ?i) (var ?j))) (I (< (var ?j) (var ?k)))) (I (< (var ?i) (var ?k))))"),
         rw!("id"; "(* (I ?c) (I ?c))" => "(I ?c)"),
@@ -265,6 +274,11 @@ pub fn rules() -> Vec<Rewrite<LARA, FvAnalysis>> {
 
 fn main() {
     // let e: RecExpr<LARA> = "(m/ (tr (m* (mat A) (m* (mat A) (mat A)))) 6)"
+    //     .parse()
+    //     .unwrap();
+
+    // let e0: RecExpr<LARA> =
+    //     "(sum i (sum j (sum k (* (* (I (< (var k) (var j))) (* (I (< (var j) (var i))) (I (> (var k) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))"
     //     .parse()
     //     .unwrap();
 
@@ -282,16 +296,81 @@ fn main() {
             .parse()
             .unwrap();
 
-    let e3: RecExpr<LARA> = "(/ (+ (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum i (sum k (sum j (* (* (I (< (var i) (var k))) (* (I (< (var k) (var j))) (I (< (var i) (var j))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum j (sum i (sum k (* (* (I (< (var j) (var i))) (* (I (< (var i) (var k))) (I (< (var j) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))))) (+ (sum j (sum k (sum i (* (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var j) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum k (sum i (sum j (* (* (I (< (var k) (var i))) (* (I (< (var i) (var j))) (I (< (var k) (var j))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum k (sum j (sum i (* (* (I (< (var k) (var j))) (* (I (< (var j) (var i))) (I (< (var k) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))))) 6)"
-            .parse()
-            .unwrap();
+    let e3: RecExpr<LARA> = 
+    "(/ (+ (+ (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (> (var k) (var i))) (I (> (var i) (var j)))))))))
+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (> (var k) (var i))) (I (< (var i) (var j)))))))))) 
+ (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (< (var k) (var i))) (I (> (var i) (var j))))))))) 
+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (> (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var i) (var j))))))))))) 
+ (+ (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (> (var k) (var i))) (I (> (var i) (var j)))))))))
+  (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (> (var k) (var i))) (I (< (var i) (var j)))))))))) 
+  (+ (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (> (var i) (var j))))))))) 
+  (sum i (sum j (sum k (* (* (A (var i) (var j)) (* (A (var j) (var k)) (A (var k) (var i)))) (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var i) (var j)))))))))))) 6)"
+//     "(/
+//   (sum i (sum j (sum k
+//   (+ (* (* (*
+//               (A (var j) (var k)) (+ (I (> (var j) (var k))) (I (< (var j) (var k)))))
+//             (*
+//               (A (var k) (var i)) (+ (I (> (var k) (var i))) (I (< (var k) (var i))))))
+//             (* (A (var i) (var j)) (I (< (var i) (var j))))) 
+//             (* (*
+//             (*
+//               (A (var j) (var k)) (+ (I (> (var j) (var k))) (I (< (var j) (var k)))))
+//             (*
+//               (A (var k) (var i)) (+ (I (> (var k) (var i))) (I (< (var k) (var i))))))
+//             (* (A (var i) (var j)) (I (> (var i) (var j)))))))))
+//   6)"
+    // "(/ (sum i (sum j (sum k (* (* (A (var i) (var j)) (+ (I (< (var i) (var j))) (+ (I (> (var i) (var j))) (I (= (var i) (var j)))))) (* (* (A (var j) (var k)) (+ (I (< (var j) (var k))) (+ (I (> (var j) (var k))) (I (= (var j) (var k)))))) (* (A (var k) (var i)) (+ (I (< (var k) (var i))) (+ (I (> (var k) (var i))) (I (= (var k) (var i))))))))))) 6)"
+    .parse()
+    .unwrap();
 
-    println!("{}", e3.pretty(20));
+    let e4: RecExpr<LARA> = 
+    "(/
+  (sum i (sum j (sum k
+  (+ (* (* (*
+              (A (var j) (var k)) (+ (I (> (var j) (var k))) (I (< (var j) (var k)))))
+            (*
+              (A (var k) (var i)) (+ (I (> (var k) (var i))) (I (< (var k) (var i))))))
+            (* (A (var i) (var j)) (I (< (var i) (var j))))) 
+            (* (*
+            (*
+              (A (var j) (var k)) (+ (I (> (var j) (var k))) (I (< (var j) (var k)))))
+            (*
+              (A (var k) (var i)) (+ (I (> (var k) (var i))) (I (< (var k) (var i))))))
+            (* (A (var i) (var j)) (I (> (var i) (var j)))))))))
+  6)"
+    .parse()
+    .unwrap();
+
+    // let e3: RecExpr<LARA> = "(/ (+ (+ (sum i (sum j (sum k (* (* (I (< (var i) (var j))) (* (I (< (var j) (var k))) (I (< (var i) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum i (sum k (sum j (* (* (I (< (var i) (var k))) (* (I (< (var k) (var j))) (I (< (var i) (var j))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum j (sum i (sum k (* (* (I (< (var j) (var i))) (* (I (< (var i) (var k))) (I (< (var j) (var k))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))))) (+ (sum j (sum k (sum i (* (* (I (< (var j) (var k))) (* (I (< (var k) (var i))) (I (< (var j) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (+ (sum k (sum i (sum j (* (* (I (< (var k) (var i))) (* (I (< (var i) (var j))) (I (< (var k) (var j))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k))))))) (sum k (sum j (sum i (* (* (I (< (var k) (var j))) (* (I (< (var j) (var i))) (I (< (var k) (var i))))) (* (* (A (var i) (var j)) (A (var j) (var k))) (A (var i) (var k)))))))))) 6)"
+    //         .parse()
+    //         .unwrap();
+    // let e3: RecExpr<LARA> = "0".parse().unwrap();
+
+    let f1: RecExpr<LARA> = "(* (* (* x (+ a b)) (* y (+ c d))) (* z (+ e f)))".parse().unwrap();
+    let f2: RecExpr<LARA> = "(+ (+ (+ (* x (* a (* y (* c (* z e))))) 
+(* x (* a (* y (* c (* z f)))))) 
+(+ (* x (* a (* y (* d (* z e)))))
+(* x (* a (* y (* d (* z f))))))) 
+(+ (+ 
+(* x (* b (* y (* c (* z e)))))
+(* x (* b (* y (* c (* z f)))))
+) (+
+(* x (* b (* y (* d (* z e)))))
+(* x (* b (* y (* d (* z f)))))
+)))".parse().unwrap();
+
+    println!("{}", e3.pretty(40));
 
     let runner = Runner::default()
-        .with_expr(&e0)
         .with_expr(&e3)
+        .with_expr(&e4)
+        // .with_expr(&e4)
+        // .with_expr(&e3)
+        .with_scheduler(SimpleScheduler)
+        .with_node_limit(5000000)
+        .with_iter_limit(50)
         .run(&rules());
 
-    dbg!(runner.egraph.equivs(&e0, &e3));
+    dbg!(runner.egraph.equivs(&e3, &e4));
+    dbg!(runner.stop_reason);
 }
