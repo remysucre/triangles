@@ -136,25 +136,6 @@ where
     }
 }
 
-// struct ClassScheduler;
-
-// impl<L, N> RewriteScheduler<L, N> for ClassScheduler
-// where
-//     L: Language,
-//     N: Analysis<L>,
-// {
-//     fn search_rewrite<'a>(
-//         &mut self,
-//         _iteration: usize,
-//         egraph: &egg::EGraph<L, N>,
-//         rewrite: &'a Rewrite<L, N>,
-//     ) -> Vec<SearchMatches<'a, L>> {
-//         let mut ms = rewrite.search(egraph);
-//         ms.retain(|m| egraph[m.eclass].len() < 20);
-//         ms
-//     }
-// }
-
 // Metadata for each class
 #[derive(Debug, PartialEq, Eq)]
 pub struct Data {
