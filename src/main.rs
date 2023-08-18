@@ -333,23 +333,24 @@ fn main() {
         // .with_expr(&e0)
         // .with_expr(&e1)
         // .with_expr(&e2)
-        // .with_expr(&e3)
+        .with_expr(&e3)
         // .with_expr(&e4)
-        // .with_expr(&e5)
+        .with_expr(&e5)
         .with_expr(&e6)
-        .with_expr(&e7)
+        // .with_expr(&e7)
         // .with_scheduler(SimpleScheduler)
         .with_scheduler(ClassScheduler)
         .with_node_limit(5000000)
         // .with_iter_limit(50)
+        .with_time_limit(std::time::Duration::new(20, 0))
         .run(&rules());
 
-    // dbg!(runner.egraph.equivs(&e0, &e1));
-    // dbg!(runner.egraph.equivs(&e1, &e2));
-    // dbg!(runner.egraph.equivs(&e2, &e3));
-    // dbg!(runner.egraph.equivs(&e3, &e4));
-    // dbg!(runner.egraph.equivs(&e4, &e5));
-    // dbg!(runner.egraph.equivs(&e5, &e6));
+    dbg!(runner.egraph.equivs(&e0, &e1));
+    dbg!(runner.egraph.equivs(&e1, &e2));
+    dbg!(runner.egraph.equivs(&e2, &e3));
+    dbg!(runner.egraph.equivs(&e3, &e4));
+    dbg!(runner.egraph.equivs(&e4, &e5));
+    dbg!(runner.egraph.equivs(&e5, &e6));
     dbg!(runner.egraph.equivs(&e6, &e7));
 
     dbg!(runner.stop_reason);
