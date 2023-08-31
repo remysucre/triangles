@@ -36,9 +36,11 @@
 (define-fun I ((b (Exp Bool))) (Exp U)
   (mk (ite (val b) one zero) (var b)))
 
-; equality over variables
+; (in/dis)equality over variables
 (define-fun eq ((i Var) (j Var)) (Exp Bool)
   (mk (= (val i) (val j)) (lambda ((x Sym)) (or (= x (var i)) (= x (var j))))))
+(define-fun neq ((i Var) (j Var)) (Exp Bool)
+  (mk (not (= (val i) (val j))) (lambda ((x Sym)) (or (= x (var i)) (= x (var j))))))
 
 ; +,* assoc., comm., dist.
 (assert (forall ((x U) (y U) (z U)) (= (add (add x y) z) (add x (add y z)))))
@@ -59,6 +61,11 @@
 (assert (forall ((x U) (e U) (t Int)) (= (mul x (sigma t e)) (sigma t (mul x e)))))
 
 ; Indicator rules
+
+(declare-const e1 Int)
+(declare-const e2 Int)
+
+(assert (not (= one (val (u+ (I (eq (mk e1 1) (mk e2 2))) (I (neq (mk e1 1) (mk e2 2))))))))
 
 ; Eq 14 from [1]
 ; sum_t[t=e] = 1
