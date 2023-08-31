@@ -65,7 +65,15 @@
 (declare-const e1 Int)
 (declare-const e2 Int)
 
-(assert (not (= one (val (u+ (I (eq (mk e1 1) (mk e2 2))) (I (neq (mk e1 1) (mk e2 2))))))))
+(declare-fun fa (Int Int) U)
+(define-fun A ((i Var) (j Var)) (Exp U)
+  (mk (fa (val i) (val j)) (lambda ((x Sym)) (or (= x (var i)) (= x (var j))))))
+
+; Eq.12 from [1] for free!
+; (assert (not (= one (val (u+ (I (eq (mk e1 1) (mk e2 2))) (I (neq (mk e1 1) (mk e2 2))))))))
+; Eq.13 from [1] for free!
+; (assert (not (= (u* (A (mk e2 2) (mk e2 2)) (I (eq (mk e1 1) (mk e2 2)))) (u* (A (mk e1 1) (mk e1 1)) (I (eq (mk e1 1) (mk e2 2)))))))
+; (assert (= (u* (A (mk e2 2) (mk e2 2)) (I (eq (mk e1 1) (mk e2 2)))) (u* (A (mk e1 1) (mk e1 1)) (I (eq (mk e1 1) (mk e2 2))))))
 
 ; Eq 14 from [1]
 ; sum_t[t=e] = 1
