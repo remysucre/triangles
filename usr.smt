@@ -22,6 +22,22 @@
 (declare-const one U)
 (declare-const zero U)
 
+; +,* assoc., comm., dist.
+(assert (forall ((x U) (y U) (z U)) (= (add (add x y) z) (add x (add y z)))))
+(assert (forall ((x U) (y U) (z U)) (= (mul (mul x y) z) (mul x (mul y z)))))
+(assert (forall ((x U) (y U)) (= (add x y) (add y x))))
+(assert (forall ((x U) (y U)) (= (mul x y) (mul y x))))
+(assert (forall ((x U) (y U) (z U)) (= (mul x (add y z)) (add (mul x y) (mul x z)))))
+
+; 0,1 id.
+(assert (forall ((x U)) (= x (add x zero))))
+(assert (forall ((x U)) (= x (mul x one))))
+(assert (forall ((x U)) (= zero (mul x zero))))
+
+; Summation rules
+(assert (forall ((t Int) (x U) (y U)) (= (sigma t (add x y)) (add (sigma t x) (sigma t y)))))
+(assert (forall ((t1 Int) (t2 Int) (x U)) (= (sigma t1 (sigma t2 x)) (sigma t2 (sigma t1 x)))))
+
 ; Propagation of free variables
 (define-fun u* ((x (Exp U)) (y (Exp U))) (Exp U)
   (mk (mul (val x) (val y)) (union (var x) (var y))))
