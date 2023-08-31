@@ -71,24 +71,26 @@
 
 ; Eq.12 from [1] for free!
 ; (assert (not (= one (val (u+ (I (eq (mk e1 1) (mk e2 2))) (I (neq (mk e1 1) (mk e2 2))))))))
+; (assert (= one (val (u+ (I (eq (mk e1 1) (mk e2 2))) (I (neq (mk e1 1) (mk e2 2)))))))
 
 ; Eq.13 from [1] for free!
 ; (assert (not (= (u* (A (mk e2 2) (mk e2 2)) (I (eq (mk e1 1) (mk e2 2)))) (u* (A (mk e1 1) (mk e1 1)) (I (eq (mk e1 1) (mk e2 2)))))))
+; (assert (= (u* (A (mk e2 2) (mk e2 2)) (I (eq (mk e1 1) (mk e2 2)))) (u* (A (mk e1 1) (mk e1 1)) (I (eq (mk e1 1) (mk e2 2))))))
 
 ; Eq 14 from [1]
 ; sum_t[t=e] = 1
-(assert (forall ((t Sym) (e Sym)) (= one (val (sum (mk t 1) (I (eq (mk t 1) (mk e 2))))))))
+; (assert (forall ((t Sym) (e Sym)) (= one (val (sum (mk t 1) (I (eq (mk t 1) (mk e 2))))))))
 
-(declare-const e Sym)
-(declare-const t Sym)
+; (declare-const e Sym)
+; (declare-const t Sym)
 
 ; Eq 15 from [1]
-(define-fun l () (Exp U) (A (mk e 1) (mk t 2)))
-(define-fun r () (Exp U) (u* (A (mk e 1) (mk t 2)) (sum (mk t 2) (I (eq (mk t 2) (mk e 1))))))
+; (define-fun l () (Exp U) (A (mk e 1) (mk t 2)))
+; (define-fun r () (Exp U) (u* (A (mk e 1) (mk t 2)) (sum (mk t 2) (I (eq (mk t 2) (mk e 1))))))
 
 ; (define-fun r () (Exp U) (sum (mk t 2) (u* (A (mk e 1) (mk t 2)) (I (eq (mk t 2) (mk e 1))))))
 
-(assert (not (= (val l) (val r))))
+; (assert (not (= (val l) (val r))))
 
 (check-sat)
 ; (get-model)
